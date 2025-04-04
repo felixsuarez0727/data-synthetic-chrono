@@ -1,0 +1,33 @@
+# Project Configuration
+
+# Data Paths
+data:
+  raw_path: "data/raw/"
+  processed_path: "data/processed/"
+  synthetic_path: "data/synthetic/"
+
+# Model Configuration
+model:
+  name: "amazon/chronos-t5-small"
+  tokenizer: "t5-small"  # Fallback tokenizer if Chronos' is unavailable
+  max_length: 48         # Prediction length for time series
+  num_beams: 10          # Number of trajectories to sample
+  temperature: 0.8       # Controls randomness (higher = more random)
+  top_k: 50              # Top-k filtering during sampling
+  top_p: 0.95            # Nucleus sampling
+  do_sample: true        # Use sampling instead of beam search
+  device: "auto"         # "auto", "cuda", or "cpu"
+  
+# Generation Configuration
+generation:
+  batch_size: 16
+  num_synthetic_samples: 100
+  seed: 42
+
+# Evaluation Configuration
+evaluation:
+  test_size: 0.2
+  metrics:
+    - "statistical_similarity"
+    - "distribution_comparison"
+    - "privacy_evaluation"
