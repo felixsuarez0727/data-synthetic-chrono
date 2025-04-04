@@ -1,5 +1,5 @@
 """
-Módulo para preprocesar datos antes de generar datos sintéticos
+Module for preprocessing data before generating synthetic data
 """
 
 import os
@@ -16,15 +16,15 @@ logger = logging.getLogger(__name__)
 
 class DataPreprocessor:
     """
-    Clase para preprocesar datos para uso con Chronos-T5
+    Class for preprocessing data for use with Chronos-T5
     """
     
     def __init__(self, config_path="config/config.yaml"):
         """
-        Inicializa el preprocesador con la configuración especificada
+        Initializes the preprocessor with the specified configuration
         
         Args:
-            config_path: Ruta al archivo de configuración YAML
+            config_path: Path to the YAML configuration file
         """
         with open(config_path, 'r', encoding='utf-8') as file:
             self.config = yaml.safe_load(file)
@@ -32,22 +32,22 @@ class DataPreprocessor:
         self.raw_path = self.config['data']['raw_path']
         self.processed_path = self.config['data']['processed_path']
         
-        # Crear directorios si no existen
+        # Create directories if they don't exist
         os.makedirs(self.raw_path, exist_ok=True)
         os.makedirs(self.processed_path, exist_ok=True)
     
     def load_data(self, filename: str) -> pd.DataFrame:
         """
-        Carga datos desde el directorio de datos raw
+        Loads data from the raw data directory
         
         Args:
-            filename: Nombre del archivo a cargar
+            filename: Name of the file to load
             
         Returns:
-            DataFrame con los datos cargados
+            DataFrame with the loaded data
         """
         file_path = os.path.join(self.raw_path, filename)
-        logger.info(f"Cargando datos desde {file_path}")
+        logger.info(f"Loading data from {file_path}")
         
         if filename.endswith('.csv'):
             df = pd.read_csv(file_path)
@@ -56,13 +56,13 @@ class DataPreprocessor:
         elif filename.endswith('.json'):
             df = pd.read_json(file_path)
         elif filename.endswith('.hdf5') or filename.endswith('.h5'):
-            # Cargar archivo HDF5
+            # Load HDF5 file
             import h5py
             
-            # Convertir datos HDF5 a DataFrame
+            # Convert HDF5 data to DataFrame
             with h5py.File(file_path, 'r') as f:
-                # Mostrar estructura del archivo HDF5
-                logger.info("Estructura del archivo HDF5:")
+                # Show HDF5 file structure
+                logger.info("HDF5 file structure:")
                 
                 def print_attrs(name, obj):
                     logger.info(f"- {name}: {type(obj)}")
@@ -70,7 +70,7 @@ class DataPreprocessor:
                 
                 f.visititems(print_attrs)
                 
-                # Identificar datasets dentro del archivo HDF5
+                # Identify datasets within the HDF5 file
                 datasets = {}
                 
                 def collect_datasets(name, obj):
@@ -80,67 +80,67 @@ class DataPreprocessor:
                 
                 f.visititems(collect_datasets)
                 
-                # Crear un DataFrame con todos los datasets encontrados
+                # Create a DataFrame with all found datasets
                 data_dict = {}
                 for name, dataset in datasets.items():
-                    # Convertir a array de numpy y luego a lista
+                    # Convert to numpy array and then to list
                     try:
-                        # Extraer datos, manejar diferentes dimensiones
-                        if dataset.shape:  # Asegurarse que no esté vacío
-                            if len(dataset.shape) == 1:  # Vector 1D
+                        # Extract data, handle different dimensions
+                        if dataset.shape:  # Make sure it's not empty
+                            if len(dataset.shape) == 1:  # 1D vector
                                 data_dict[name] = dataset[:]
-                            elif len(dataset.shape) == 2:  # Matriz 2D
-                                # Para cada columna en el dataset 2D
+                            elif len(dataset.shape) == 2:  # 2D matrix
+                                # For each column in the 2D dataset
                                 for i in range(dataset.shape[1]):
                                     data_dict[f"{name}_col{i}"] = dataset[:, i]
                             else:
-                                # Para datasets multidimensionales, aplanar
+                                # For multidimensional datasets, flatten
                                 flat_data = dataset[:].flatten()
-                                data_dict[f"{name}_flattened"] = flat_data[:min(len(flat_data), 1000)]  # Limitar tamaño
+                                data_dict[f"{name}_flattened"] = flat_data[:min(len(flat_data), 1000)]  # Limit size
                     except Exception as e:
-                        logger.warning(f"No se pudieron extraer datos de {name}: {e}")
+                        logger.warning(f"Could not extract data from {name}: {e}")
                 
-                # Crear DataFrame, asegurando que todas las columnas tengan la misma longitud
+                # Create DataFrame, ensuring all columns have the same length
                 max_len = max([len(arr) for arr in data_dict.values()]) if data_dict else 0
                 
                 for key, val in data_dict.items():
                     if len(val) < max_len:
-                        # Rellenar con NaN si es necesario
+                        # Fill with NaN if necessary
                         data_dict[key] = np.pad(val, (0, max_len - len(val)), 
                                                'constant', constant_values=np.nan)
                 
                 df = pd.DataFrame(data_dict)
                 
-                # Si el DataFrame está vacío, intentar otra estrategia
+                # If the DataFrame is empty, try another strategy
                 if df.empty:
-                    logger.warning("No se pudieron extraer datos usando el método estándar. Intentando método alternativo.")
-                    # Crear un DataFrame simple con algunos atributos del archivo
+                    logger.warning("Could not extract data using the standard method. Trying alternative method.")
+                    # Create a simple DataFrame with some file attributes
                     attrs_dict = {}
                     for name, dataset in datasets.items():
-                        # Añadir atributos como metadatos
+                        # Add attributes as metadata
                         for attr_name, attr_value in dataset.attrs.items():
                             attrs_dict[f"{name}_{attr_name}"] = [str(attr_value)]
                     
                     if attrs_dict:
                         df = pd.DataFrame(attrs_dict)
                     else:
-                        # Si no hay datos útiles, crear un DataFrame mínimo
+                        # If there's no useful data, create a minimal DataFrame
                         df = pd.DataFrame({'filename': [filename], 'hdf5_keys': [', '.join(list(datasets.keys()))]})
         else:
-            raise ValueError(f"Formato de archivo no soportado: {filename}")
+            raise ValueError(f"Unsupported file format: {filename}")
         
-        logger.info(f"Datos cargados: {df.shape[0]} filas, {df.shape[1]} columnas")
+        logger.info(f"Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
         return df
     
     def _detect_data_types(self, df: pd.DataFrame) -> Dict[str, str]:
         """
-        Detecta los tipos de datos en cada columna
+        Detects data types in each column
         
         Args:
-            df: DataFrame a analizar
+            df: DataFrame to analyze
         
         Returns:
-            Diccionario con tipo de datos para cada columna
+            Dictionary with data type for each column
         """
         column_types = {}
         
@@ -161,26 +161,26 @@ class DataPreprocessor:
     
     def preprocess_data(self, df: pd.DataFrame, output_file: str = "processed_data.csv") -> pd.DataFrame:
         """
-        Preprocesa los datos para su uso con Chronos-T5
+        Preprocesses the data for use with Chronos-T5
         
         Args:
-            df: DataFrame con datos raw
-            output_file: Nombre del archivo de salida
+            df: DataFrame with raw data
+            output_file: Name of the output file
             
         Returns:
-            DataFrame preprocesado
+            Preprocessed DataFrame
         """
-        logger.info("Iniciando preprocesamiento de datos...")
+        logger.info("Starting data preprocessing...")
         
-        # Detectar tipos de columnas
+        # Detect column types
         column_types = self._detect_data_types(df)
-        logger.info(f"Tipos de columnas detectados: {column_types}")
+        logger.info(f"Detected column types: {column_types}")
         
-        # Procesar valores faltantes
+        # Process missing values
         for col in df.columns:
             missing_count = df[col].isna().sum()
             if missing_count > 0:
-                logger.info(f"Columna '{col}' tiene {missing_count} valores faltantes")
+                logger.info(f"Column '{col}' has {missing_count} missing values")
                 
                 if column_types[col] in ['integer', 'float']:
                     df[col] = df[col].fillna(df[col].median())
@@ -189,98 +189,98 @@ class DataPreprocessor:
                 else:
                     df[col] = df[col].fillna("")
         
-        # Convertir a formato adecuado para Chronos-T5
-        # Chronos-T5 trabaja con texto, por lo que necesitamos convertir los datos
-        # a un formato que el modelo pueda entender
+        # Convert to appropriate format for Chronos-T5
+        # Chronos-T5 works with text, so we need to convert the data
+        # to a format that the model can understand
         
-        # Guardar el dataframe procesado
+        # Save the processed dataframe
         output_path = os.path.join(self.processed_path, output_file)
         df.to_csv(output_path, index=False)
-        logger.info(f"Datos preprocesados guardados en {output_path}")
+        logger.info(f"Preprocessed data saved to {output_path}")
         
         return df
     
     def prepare_for_chronos(self, df: pd.DataFrame) -> List[torch.Tensor]:
         """
-        Prepara los datos para ser procesados por Chronos-T5
+        Prepares the data to be processed by Chronos-T5
         
         Args:
-            df: DataFrame preprocesado
+            df: Preprocessed DataFrame
             
         Returns:
-            Lista de tensores para Chronos
+            List of tensors for Chronos
         """
-        # Chronos-T5 espera datos de series temporales como tensores
-        # Necesitamos extraer las series temporales del DataFrame
+        # Chronos-T5 expects time series data as tensors
+        # We need to extract time series from the DataFrame
         
         import torch
         
-        # Identificar columnas numéricas (potencialmente series temporales)
+        # Identify numeric columns (potentially time series)
         numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
         
         if not numeric_cols:
-            logger.warning("No se encontraron columnas numéricas. Chronos requiere datos numéricos de series temporales.")
-            # Crear algunas series temporales sintéticas básicas como ejemplo
+            logger.warning("No numeric columns found. Chronos requires numeric time series data.")
+            # Create some basic synthetic time series as an example
             series_data = [torch.tensor(np.sin(np.linspace(0, 4*np.pi, 100)) + 0.1 * np.random.randn(100))]
             return series_data
         
-        # Extraer series temporales
+        # Extract time series
         series_data = []
         
-        # Caso 1: Si hay muchas filas y pocas columnas numéricas, asumimos que cada columna es una serie temporal
+        # Case 1: If there are many rows and few numeric columns, we assume each column is a time series
         if len(df) > 10 and len(numeric_cols) < 10:
             for col in numeric_cols:
                 series = df[col].dropna().values
-                if len(series) > 10:  # Solo si hay suficientes puntos de datos
+                if len(series) > 10:  # Only if there are enough data points
                     series_data.append(torch.tensor(series, dtype=torch.float32))
         
-        # Caso 2: Si hay pocas filas y muchas columnas numéricas, asumimos que cada fila es un punto en varias series temporales
+        # Case 2: If there are few rows and many numeric columns, we assume each row is a point in multiple time series
         elif len(df) < 10 and len(numeric_cols) > 10:
-            # Transponer el DataFrame para obtener series temporales
+            # Transpose the DataFrame to get time series
             transposed_data = df[numeric_cols].T.values
-            for i in range(min(10, transposed_data.shape[0])):  # Limitar a 10 series
+            for i in range(min(10, transposed_data.shape[0])):  # Limit to 10 series
                 series_data.append(torch.tensor(transposed_data[i], dtype=torch.float32))
         
-        # Caso 3: Si hay estructura mixta, intentar buscar patrones de series temporales
+        # Case 3: If there's a mixed structure, try to look for time series patterns
         else:
-            # Buscar columnas que parezcan índices temporales
+            # Look for columns that appear to be time indices
             potential_time_cols = [col for col in df.columns if 'time' in col.lower() or 'date' in col.lower() or 'timestamp' in col.lower()]
             
             if potential_time_cols:
                 time_col = potential_time_cols[0]
-                # Ordenar por la columna temporal
+                # Sort by the time column
                 df_sorted = df.sort_values(by=time_col)
                 
-                # Extraer series para cada columna numérica
+                # Extract series for each numeric column
                 for col in numeric_cols:
                     if col != time_col:
                         series = df_sorted[col].dropna().values
                         if len(series) > 10:
                             series_data.append(torch.tensor(series, dtype=torch.float32))
             else:
-                # Si no encontramos estructura clara, tomamos las primeras columnas numéricas
+                # If we don't find a clear structure, take the first numeric columns
                 for col in numeric_cols[:min(5, len(numeric_cols))]:
                     series = df[col].dropna().values
                     if len(series) > 10:
                         series_data.append(torch.tensor(series, dtype=torch.float32))
         
-        # Si no encontramos series adecuadas, crear una serie sintética básica
+        # If we didn't find suitable series, create a basic synthetic series
         if not series_data:
-            logger.warning("No se encontraron series temporales adecuadas. Usando una serie sintética de ejemplo.")
+            logger.warning("No suitable time series found. Using a synthetic example series.")
             series_data = [torch.tensor(np.sin(np.linspace(0, 4*np.pi, 100)) + 0.1 * np.random.randn(100))]
         
-        logger.info(f"Se han preparado {len(series_data)} series temporales para Chronos-T5")
+        logger.info(f"{len(series_data)} time series have been prepared for Chronos-T5")
         return series_data
     
     def split_train_test(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Divide los datos en conjuntos de entrenamiento y prueba
+        Splits the data into training and test sets
         
         Args:
-            df: DataFrame a dividir
+            df: DataFrame to split
             
         Returns:
-            Tupla de (train_df, test_df)
+            Tuple of (train_df, test_df)
         """
         test_size = self.config['evaluation']['test_size']
         train_df, test_df = train_test_split(
@@ -289,9 +289,9 @@ class DataPreprocessor:
             random_state=self.config['generation']['seed']
         )
         
-        logger.info(f"Datos divididos: {train_df.shape[0]} para entrenamiento, {test_df.shape[0]} para pruebas")
+        logger.info(f"Data split: {train_df.shape[0]} for training, {test_df.shape[0]} for testing")
         
-        # Guardar los conjuntos
+        # Save the sets
         train_df.to_csv(os.path.join(self.processed_path, "train_data.csv"), index=False)
         test_df.to_csv(os.path.join(self.processed_path, "test_data.csv"), index=False)
         
@@ -299,16 +299,16 @@ class DataPreprocessor:
 
 
 if __name__ == "__main__":
-    # Prueba rápida del preprocesador
+    # Quick test of the preprocessor
     preprocessor = DataPreprocessor()
-    # Asumiendo que hay un archivo sample.csv en la carpeta raw
+    # Assuming there's a sample.csv file in the raw folder
     try:
         df = preprocessor.load_data("sample.csv")
         processed_df = preprocessor.preprocess_data(df)
         train_df, test_df = preprocessor.split_train_test(processed_df)
         formatted_texts = preprocessor.prepare_for_chronos(train_df.head(5))
-        print("Ejemplo de textos formateados:")
+        print("Example of formatted texts:")
         for text in formatted_texts[:2]:
             print(text)
     except FileNotFoundError:
-        print("Archivo de ejemplo no encontrado. Por favor, coloca un archivo en la carpeta 'data/raw/'")
+        print("Example file not found. Please place a file in the 'data/raw/' folder")

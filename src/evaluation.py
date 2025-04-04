@@ -1,5 +1,5 @@
 """
-Módulo para evaluar la calidad de los pronósticos de series temporales generados
+Module for evaluating the quality of generated time series forecasts
 """
 
 import os
@@ -18,15 +18,15 @@ logger = logging.getLogger(__name__)
 
 class TimeSeriesEvaluator:
     """
-    Clase para evaluar la calidad de los pronósticos de series temporales generados
+    Class for evaluating the quality of generated time series forecasts
     """
     
     def __init__(self, config_path="config/config.yaml"):
         """
-        Inicializa el evaluador con la configuración especificada
+        Initializes the evaluator with the specified configuration
         
         Args:
-            config_path: Ruta al archivo de configuración YAML
+            config_path: Path to the YAML configuration file
         """
         with open(config_path, 'r', encoding='utf-8') as file:
             self.config = yaml.safe_load(file)
@@ -35,32 +35,32 @@ class TimeSeriesEvaluator:
         self.synthetic_path = self.config['data']['synthetic_path']
         self.metrics = self.config['evaluation']['metrics']
         
-        # Crear directorio para resultados de evaluación
+        # Create directory for evaluation results
         self.results_path = os.path.join(self.synthetic_path, "evaluation")
         os.makedirs(self.results_path, exist_ok=True)
     
     def load_datasets(self, real_data_file: str, synthetic_data_file: str) -> Tuple[Dict[str, np.ndarray], Dict[str, pd.DataFrame]]:
         """
-        Carga los conjuntos de datos real y los pronósticos sintéticos
+        Loads the real data sets and synthetic forecasts
         
         Args:
-            real_data_file: Nombre del archivo con datos reales
-            synthetic_data_file: Nombre del archivo con datos sintéticos
+            real_data_file: Name of the file with real data
+            synthetic_data_file: Name of the file with synthetic data
             
         Returns:
-            Tupla de (datos_reales, pronósticos)
+            Tuple of (real_data, forecasts)
         """
-        # Cargar datos reales
+        # Load real data
         real_path = os.path.join(self.processed_path, real_data_file)
-        logger.info(f"Cargando datos reales desde {real_path}")
+        logger.info(f"Loading real data from {real_path}")
         real_df = pd.read_csv(real_path)
         
-        # Cargar pronósticos sintéticos
+        # Load synthetic forecasts
         synthetic_path = os.path.join(self.synthetic_path, synthetic_data_file)
-        logger.info(f"Cargando datos sintéticos desde {synthetic_path}")
+        logger.info(f"Loading synthetic data from {synthetic_path}")
         synthetic_df = pd.read_csv(synthetic_path)
         
-        # Cargar pronósticos individuales
+        # Load individual forecasts
         forecasts = {}
         forecast_files = [f for f in os.listdir(self.synthetic_path) if f.startswith('forecast_series_') and f.endswith('.csv')]
         
@@ -69,47 +69,47 @@ class TimeSeriesEvaluator:
             forecast_path = os.path.join(self.synthetic_path, file)
             forecasts[series_id] = pd.read_csv(forecast_path)
         
-        # Extraer series temporales del DataFrame real
+        # Extract time series from the real DataFrame
         real_series = {}
         
-        # Identificar columnas numéricas (potenciales series temporales)
+        # Identify numeric columns (potential time series)
         numeric_cols = real_df.select_dtypes(include=['number']).columns.tolist()
         
-        # Método simple: usar cada columna numérica como una serie temporal
+        # Simple method: use each numeric column as a time series
         for i, col in enumerate(numeric_cols):
             series = real_df[col].dropna().values
-            if len(series) > 10:  # Solo si hay suficientes puntos de datos
+            if len(series) > 10:  # Only if there are enough data points
                 real_series[i] = series
         
         return real_series, forecasts
     
     def evaluate_forecast_accuracy(self, actual: np.ndarray, forecast: np.ndarray) -> Dict[str, float]:
         """
-        Evalúa la precisión de un pronóstico
+        Evaluates the accuracy of a forecast
         
         Args:
-            actual: Valores reales
-            forecast: Valores pronosticados
+            actual: Real values
+            forecast: Forecasted values
             
         Returns:
-            Diccionario con métricas de precisión
+            Dictionary with accuracy metrics
         """
-        # Si los tamaños no coinciden, recortar al más corto
+        # If sizes don't match, trim to the shortest one
         min_length = min(len(actual), len(forecast))
         actual = actual[-min_length:]
         forecast = forecast[:min_length]
         
-        # Calcular métricas
+        # Calculate metrics
         rmse = np.sqrt(mean_squared_error(actual, forecast))
         mae = mean_absolute_error(actual, forecast)
         
-        # MAPE puede dar error si hay valores cero en actual
+        # MAPE can error if there are zero values in actual
         try:
             mape = mean_absolute_percentage_error(actual, forecast) * 100
         except:
             mape = np.nan
         
-        # Coeficiente de determinación (R²)
+        # Coefficient of determination (R²)
         ss_tot = np.sum((actual - np.mean(actual)) ** 2)
         ss_res = np.sum((actual - forecast) ** 2)
         r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
@@ -123,179 +123,179 @@ class TimeSeriesEvaluator:
     
     def visualize_forecast(self, series_id: int, actual: np.ndarray, forecast_df: pd.DataFrame, prediction_length: int = 24) -> None:
         """
-        Visualiza una serie temporal y su pronóstico
+        Visualizes a time series and its forecast
         
         Args:
-            series_id: ID de la serie temporal
-            actual: Valores reales
-            forecast_df: DataFrame con los pronósticos
-            prediction_length: Longitud del pronóstico
+            series_id: ID of the time series
+            actual: Real values
+            forecast_df: DataFrame with the forecasts
+            prediction_length: Length of the forecast
             
         Returns:
-            None (guarda la visualización en un archivo)
+            None (saves the visualization to a file)
         """
         plt.figure(figsize=(12, 6))
         
-        # Datos históricos
+        # Historical data
         history_idx = range(len(actual) - prediction_length)
         history = actual[:-prediction_length] if len(actual) > prediction_length else actual
-        plt.plot(history_idx, history, 'b-', label='Datos históricos')
+        plt.plot(history_idx, history, 'b-', label='Historical data')
         
-        # Valores reales del período de pronóstico (si están disponibles)
+        # Real values of the forecast period (if available)
         if len(actual) > prediction_length:
             actual_future = actual[-prediction_length:]
             future_idx = range(len(actual) - prediction_length, len(actual))
-            plt.plot(future_idx, actual_future, 'k-', label='Valores reales')
+            plt.plot(future_idx, actual_future, 'k-', label='Real values')
         
-        # Pronóstico
+        # Forecast
         if 'median_forecast' in forecast_df.columns:
             forecast_idx = range(len(actual) - prediction_length, len(actual) - prediction_length + len(forecast_df))
-            plt.plot(forecast_idx, forecast_df['median_forecast'], 'r-', label='Pronóstico (mediana)')
+            plt.plot(forecast_idx, forecast_df['median_forecast'], 'r-', label='Forecast (median)')
             
-            # Intervalos de predicción (si están disponibles)
+            # Prediction intervals (if available)
             if 'lower_bound' in forecast_df.columns and 'upper_bound' in forecast_df.columns:
                 plt.fill_between(
                     forecast_idx,
                     forecast_df['lower_bound'],
                     forecast_df['upper_bound'],
                     color='r', alpha=0.3,
-                    label='Intervalo 80% de predicción'
+                    label='80% prediction interval'
                 )
         
-        # Ajustar gráfico
-        plt.title(f'Pronóstico para serie temporal {series_id}')
+        # Adjust plot
+        plt.title(f'Forecast for time series {series_id}')
         plt.grid(True)
         plt.legend()
         
-        # Guardar visualización
+        # Save visualization
         plt.savefig(os.path.join(self.results_path, f'forecast_series_{series_id}.png'))
         plt.close()
         
-        logger.info(f"Visualización guardada para serie {series_id}")
+        logger.info(f"Visualization saved for series {series_id}")
     
     def evaluate_all_forecasts(self, real_series: Dict[str, np.ndarray], forecasts: Dict[str, pd.DataFrame]) -> Dict[str, Dict[str, float]]:
         """
-        Evalúa todos los pronósticos disponibles
+        Evaluates all available forecasts
         
         Args:
-            real_series: Diccionario con series temporales reales
-            forecasts: Diccionario con DataFrames de pronósticos
+            real_series: Dictionary with real time series
+            forecasts: Dictionary with forecast DataFrames
             
         Returns:
-            Diccionario con métricas para cada serie temporal
+            Dictionary with metrics for each time series
         """
         all_metrics = {}
         
         for series_id, forecast_df in forecasts.items():
-            # Verificar si tenemos datos reales para esta serie
+            # Check if we have real data for this series
             if series_id not in real_series:
-                logger.warning(f"No hay datos reales para la serie {series_id}")
+                logger.warning(f"No real data available for series {series_id}")
                 continue
             
             actual = real_series[series_id]
             predicted = forecast_df['median_forecast'].values
             
-            # Calcular métricas
+            # Calculate metrics
             metrics = self.evaluate_forecast_accuracy(actual, predicted)
             all_metrics[str(series_id)] = metrics
             
-            # Visualizar pronóstico
+            # Visualize forecast
             self.visualize_forecast(series_id, actual, forecast_df)
         
         return all_metrics
     
     def visualize_metric_distribution(self, all_metrics: Dict[str, Dict[str, float]]) -> None:
         """
-        Visualiza la distribución de las métricas de evaluación
+        Visualizes the distribution of evaluation metrics
         
         Args:
-            all_metrics: Diccionario con métricas para cada serie temporal
+            all_metrics: Dictionary with metrics for each time series
             
         Returns:
-            None (guarda la visualización en un archivo)
+            None (saves the visualization to a file)
         """
-        # Convertir diccionario de métricas a DataFrame
+        # Convert metrics dictionary to DataFrame
         metrics_df = pd.DataFrame.from_dict(all_metrics, orient='index')
         
-        # Visualizar distribución de métricas
+        # Visualize metrics distribution
         plt.figure(figsize=(15, 10))
         
         # RMSE
         plt.subplot(2, 2, 1)
         sns.histplot(metrics_df['rmse'].dropna())
-        plt.title('Distribución de RMSE')
+        plt.title('RMSE Distribution')
         plt.xlabel('RMSE')
         
         # MAE
         plt.subplot(2, 2, 2)
         sns.histplot(metrics_df['mae'].dropna())
-        plt.title('Distribución de MAE')
+        plt.title('MAE Distribution')
         plt.xlabel('MAE')
         
         # MAPE
         plt.subplot(2, 2, 3)
         sns.histplot(metrics_df['mape'].dropna())
-        plt.title('Distribución de MAPE (%)')
+        plt.title('MAPE (%) Distribution')
         plt.xlabel('MAPE (%)')
         
         # R²
         plt.subplot(2, 2, 4)
         sns.histplot(metrics_df['r2'].dropna())
-        plt.title('Distribución de R²')
+        plt.title('R² Distribution')
         plt.xlabel('R²')
         
         plt.tight_layout()
         plt.savefig(os.path.join(self.results_path, 'metric_distributions.png'))
         plt.close()
         
-        logger.info("Visualización de distribución de métricas guardada")
+        logger.info("Metrics distribution visualization saved")
     
     def run_evaluation(self, real_data_file: str = "test_data.csv", 
                       synthetic_data_file: str = "synthetic_data.csv") -> Dict:
         """
-        Ejecuta la evaluación completa de pronósticos
+        Runs complete forecast evaluation
         
         Args:
-            real_data_file: Nombre del archivo con datos reales
-            synthetic_data_file: Nombre del archivo con datos sintéticos
+            real_data_file: Name of the file with real data
+            synthetic_data_file: Name of the file with synthetic data
             
         Returns:
-            Diccionario con resultados de evaluación
+            Dictionary with evaluation results
         """
-        logger.info("Iniciando evaluación de pronósticos de series temporales...")
+        logger.info("Starting time series forecast evaluation...")
         
-        # Cargar datos
+        # Load data
         real_series, forecasts = self.load_datasets(real_data_file, synthetic_data_file)
         
-        # Si no hay series para evaluar
+        # If there are no series to evaluate
         if not real_series or not forecasts:
-            logger.warning("No hay suficientes datos para evaluar")
+            logger.warning("Not enough data to evaluate")
             return {}
         
-        # Evaluar todos los pronósticos
+        # Evaluate all forecasts
         all_metrics = self.evaluate_all_forecasts(real_series, forecasts)
         
-        # Visualizar distribución de métricas
+        # Visualize metrics distribution
         if all_metrics:
             self.visualize_metric_distribution(all_metrics)
         
-        # Calcular métricas promedio
+        # Calculate average metrics
         avg_metrics = {}
         for metric in ['rmse', 'mae', 'mape', 'r2']:
             values = [m[metric] for m in all_metrics.values() if not np.isnan(m[metric])]
             avg_metrics[f'avg_{metric}'] = np.mean(values) if values else np.nan
         
-        # Combinar resultados
+        # Combine results
         results = {
             'individual_metrics': all_metrics,
             'average_metrics': avg_metrics
         }
         
-        # Guardar resultados
+        # Save results
         results_file = os.path.join(self.results_path, 'evaluation_results.json')
         with open(results_file, 'w') as f:
             import json
-            # Convertir valores numpy a Python nativos para serialización JSON
+            # Convert numpy values to native Python for JSON serialization
             def convert_numpy(obj):
                 if isinstance(obj, np.integer):
                     return int(obj)
@@ -305,7 +305,7 @@ class TimeSeriesEvaluator:
                     return obj.tolist()
                 return obj
             
-            # Crear versión serializable
+            # Create serializable version
             serializable_results = {}
             for key, value in results.items():
                 if isinstance(value, dict):
@@ -315,18 +315,18 @@ class TimeSeriesEvaluator:
             
             json.dump(serializable_results, f, indent=2)
         
-        logger.info(f"Evaluación completada. Resultados guardados en {results_file}")
+        logger.info(f"Evaluation completed. Results saved in {results_file}")
         
         return results
 
 
 if __name__ == "__main__":
-    # Prueba rápida del evaluador
+    # Quick test of the evaluator
     try:
         evaluator = TimeSeriesEvaluator()
         results = evaluator.run_evaluation()
-        print("Evaluación completada con éxito")
+        print("Evaluation completed successfully")
     except FileNotFoundError:
-        print("Archivos de datos no encontrados. Primero genera pronósticos sintéticos.")
+        print("Data files not found. First generate synthetic forecasts.")
     except Exception as e:
-        print(f"Error durante la evaluación: {str(e)}")
+        print(f"Error during evaluation: {str(e)}")
